@@ -40,7 +40,7 @@ This project can serve as a foundation for developing syntax-highlighting extens
 
 The resulting zip package is outputted to:
 ```
-output/Json LSP.zip
+output/extension.zip
 ```
 
 This project is licensed under the [MIT License]().
