@@ -7,10 +7,11 @@ on:
     branches:
       - main
       - master
+      - feature/external-assets-runtime
   pull_request:
 
 permissions:
-  contents: read 
+  contents: read
 
 jobs:
   build:
@@ -18,26 +19,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout source code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Setup JDK
       - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      # Make scripts executable
       - name: Make scripts executable
         run: chmod +x ./gradlew && chmod +x ./compileDebug && chmod +x ./compileRelease
 
-      # Build (Debug)
       - name: Compile Debug
         run: ./compileDebug
-        
-      # Upload extension artifacts
+
       - name: Upload ZIP
         uses: actions/upload-artifact@v4
         with:
