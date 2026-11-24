@@ -31,19 +31,7 @@ class Main(context: ExtensionContext) : ExtensionAPI(context) {
             if (missingFiles.isNotEmpty()) {
                 Log.e(TAG, "Missing external Astro asset files: ${missingFiles.joinToString()}")
             } else {
-                val resolver = ExternalAssetsFileResolver(assetsDirectory)
-                fileResolver = resolver
-                FileProviderRegistry.getInstance().addFileProvider(resolver)
-
-                try {
-                    val grammars = GrammarRegistry.getInstance().loadGrammars("languages.json")
-                    check(grammars.isNotEmpty()) { "languages.json did not define any grammars" }
-                    Log.i(TAG, "Loaded Astro grammar assets from ${assetsDirectory.absolutePath}")
-                } catch (error: Exception) {
-                    Log.e(TAG, "Could not load Astro grammar assets from ${assetsDirectory.absolutePath}", error)
-                    FileProviderRegistry.getInstance().removeFileProvider(resolver)
-                    fileResolver = null
-                }
+                loadExternalGrammars(assetsDirectory)
             }
         }
 
@@ -52,9 +40,40 @@ class Main(context: ExtensionContext) : ExtensionAPI(context) {
         FileTypeManager.register(fileType)
     }
 
+    /**
+     * FileProviderRegistry synchronizes provider mutations but its
+     * tryGetInputStream() iteration is not synchronized. Keep registration and
+     * grammar loading under the registry monitor so another extension cannot
+     * mutate the provider ArrayList while GrammarRegistry is reading it.
+     */
+    private fun loadExternalGrammars(assetsDirectory: File) {
+        val registry = FileProviderRegistry.getInstance()
+        val resolver = ExternalAssetsFileResolver(assetsDirectory)
+
+        synchronized(registry) {
+            try {
+                registry.addFileProvider(resolver)
+
+                val grammars = GrammarRegistry.getInstance().loadGrammars("languages.json")
+                check(grammars.isNotEmpty()) { "languages.json did not define any grammars" }
+
+                fileResolver = resolver
+                Log.i(TAG, "Loaded Astro grammar assets from ${assetsDirectory.absolutePath}")
+            } catch (error: Exception) {
+                Log.e(TAG, "Could not load Astro grammar assets from ${assetsDirectory.absolutePath}", error)
+                registry.removeFileProvider(resolver)
+                resolver.dispose()
+            }
+        }
+    }
+
     override fun onDispose() {
+        val registry = FileProviderRegistry.getInstance()
         fileResolver?.let { resolver ->
-            FileProviderRegistry.getInstance().removeFileProvider(resolver)
+            synchronized(registry) {
+                registry.removeFileProvider(resolver)
+                resolver.dispose()
+            }
         }
         fileResolver = null
 
