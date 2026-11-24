@@ -21,17 +21,29 @@ class Main(context: ExtensionContext) : ExtensionAPI(context) {
         if (assetsDirectory == null || !assetsDirectory.isDirectory || !assetsDirectory.canRead()) {
             Log.e(TAG, "External Astro assets directory is missing or unreadable: ${assetsDirectory?.absolutePath ?: "HOME is not set"}")
         } else {
-            val resolver = ExternalAssetsFileResolver(assetsDirectory)
-            fileResolver = resolver
-            FileProviderRegistry.getInstance().addFileProvider(resolver)
+            val requiredFiles = listOf(
+                "languages.json",
+                "astro.tmLanguage.json",
+                "Astro.config.json"
+            )
+            val missingFiles = requiredFiles.filterNot { File(assetsDirectory, it).isFile }
 
-            try {
-                GrammarRegistry.getInstance().loadGrammars("languages.json")
-                Log.i(TAG, "Loaded Astro grammar assets from ${assetsDirectory.absolutePath}")
-            } catch (error: Exception) {
-                Log.e(TAG, "Could not load Astro grammar assets from ${assetsDirectory.absolutePath}", error)
-                FileProviderRegistry.getInstance().removeFileProvider(resolver)
-                fileResolver = null
+            if (missingFiles.isNotEmpty()) {
+                Log.e(TAG, "Missing external Astro asset files: ${missingFiles.joinToString()}")
+            } else {
+                val resolver = ExternalAssetsFileResolver(assetsDirectory)
+                fileResolver = resolver
+                FileProviderRegistry.getInstance().addFileProvider(resolver)
+
+                try {
+                    val grammars = GrammarRegistry.getInstance().loadGrammars("languages.json")
+                    check(grammars.isNotEmpty()) { "languages.json did not define any grammars" }
+                    Log.i(TAG, "Loaded Astro grammar assets from ${assetsDirectory.absolutePath}")
+                } catch (error: Exception) {
+                    Log.e(TAG, "Could not load Astro grammar assets from ${assetsDirectory.absolutePath}", error)
+                    FileProviderRegistry.getInstance().removeFileProvider(resolver)
+                    fileResolver = null
+                }
             }
         }
 
